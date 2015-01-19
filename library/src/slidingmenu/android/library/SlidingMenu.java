@@ -1,7 +1,5 @@
 package slidingmenu.android.library;
 
-import com.nineoldandroids.view.ViewPropertyAnimator;
-
 import android.content.Context;
 import android.support.v4.view.MotionEventCompat;
 import android.util.AttributeSet;
@@ -24,9 +22,9 @@ public class SlidingMenu extends FrameLayout {
 
     private int mMode = LEFT;
 
-    private CustomViewWrapper mBehindView;
+    private CustomViewBehind mBehindView;
 
-    private CustomViewWrapper mAboveView;
+    private CustomViewAbove mAboveView;
 
     private VelocityTracker mVelocityTracker;
 
@@ -40,13 +38,11 @@ public class SlidingMenu extends FrameLayout {
 
     private float mLastMotionY = -1;
 
-    private int mCurTranslationX = 0;
+    private float mSrcTranslationX = 0f;
 
-    private float mCurScale = 1f;
+    private float mDstTranslationX = 200f;
 
-    private int mDstTranslationX = 200;
-
-    private float mDstScale = 0.9f;
+    private float mOpenPercent = 0.0f;
 
     public SlidingMenu(Context context) {
         this(context, null);
@@ -59,10 +55,10 @@ public class SlidingMenu extends FrameLayout {
     public SlidingMenu(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
 
-        mBehindView = new CustomViewWrapper(context, attrs);
+        mBehindView = new CustomViewBehind(context, attrs);
         addView(mBehindView, 0);
 
-        mAboveView = new CustomViewWrapper(context, attrs);
+        mAboveView = new CustomViewAbove(context, attrs);
         addView(mAboveView, 1);
 
     }
@@ -92,40 +88,44 @@ public class SlidingMenu extends FrameLayout {
     }
 
     public void toggle() {
-        if (isMenuShowing()) {
-            showContent();
+        toggle(true);
+    }
+
+    public void toggle(boolean animate) {
+        if (isOpened()) {
+            showContent(animate);
         } else {
-            showMenu();
+            showMenu(animate);
         }
     }
 
     public void showMenu() {
-        animate(mDstTranslationX, mDstScale, true /* animate */);
+        showMenu(true);
+    }
+
+    public void showMenu(boolean animate) {
+        mAboveView.animate(1.0f, true);
+        mBehindView.animate(1.0f, true);
     }
 
     public void showContent() {
-        animate(0f /* translationX */, 1.0f /* scale */, true /* animate */);
+        showContent(true);
     }
 
-    public void animate(float translationX, float scale, boolean animate) {
-        if (mAboveView != null) {
-            Log.d("SlidingMenu", "translationX = " + translationX + "; scale = " + scale);
-            mCurTranslationX = (int) translationX;
-            mCurScale = scale;
-            ViewPropertyAnimator.animate(mAboveView).setDuration(animate ? 500 : 0).scaleX(mCurScale).scaleY(mCurScale)
-                    .translationX(mCurTranslationX).start();
-        }
+    public void showContent(boolean animate) {
+        mAboveView.animate(0.0f, true);
+        mBehindView.animate(0.0f, true);
     }
 
-    public boolean isMenuShowing() {
-        return mCurTranslationX == mDstTranslationX;
+    public boolean isOpened() {
+        return mAboveView.isOpened() || mBehindView.isOpened();
     }
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         final int action = ev.getAction() & MotionEventCompat.ACTION_MASK;
 
-        Log.w("SlidingMenu", "onInterceptTouchEvent action: " + Util.convertMotionEvent2String(action));
+        LogUtil.d("SlidingMenu", "onInterceptTouchEvent action: " + Util.convertMotionEvent2String(action));
 
         switch (action) {
             case MotionEvent.ACTION_DOWN:
@@ -141,6 +141,8 @@ public class SlidingMenu extends FrameLayout {
                 break;
             case MotionEvent.ACTION_MOVE:
                 determineDrag(ev);
+                break;
+            default:
                 break;
         }
 
@@ -159,7 +161,8 @@ public class SlidingMenu extends FrameLayout {
     public boolean onTouchEvent(MotionEvent ev) {
         final int action = ev.getAction() & MotionEvent.ACTION_MASK;
 
-        Log.w("SlidingMenu", "onTouchEvent action: " + Util.convertMotionEvent2String(action));
+        LogUtil.d("SlidingMenu", "onTouchEvent action: " + Util.convertMotionEvent2String(action));
+
         if (mVelocityTracker == null) {
             mVelocityTracker = VelocityTracker.obtain();
         }
@@ -181,35 +184,38 @@ public class SlidingMenu extends FrameLayout {
                     }
 
                     final float x = MotionEventCompat.getX(ev, activePointerIndex);
+                    final float y = MotionEventCompat.getY(ev, activePointerIndex);
+
                     final float deltaX = x - mLastMotionX;
 
                     mLastMotionX = x;
+                    mLastMotionY = y;
 
-                    float translationX = mCurTranslationX + deltaX;
-                    if (deltaX > 0) {
-                        translationX = (int) Math.min(mDstTranslationX, translationX);
-                    } else {
-                        translationX = (int) Math.max(0f, translationX);
-                    }
+                    float percent = mOpenPercent + deltaX / Math.abs(mSrcTranslationX - mDstTranslationX);
 
-                    float scale = 1.0f - (1.0f - mDstScale) * (translationX / mDstTranslationX);
-
-                    Log.d("SlidingMenu", "scale = " + scale);
+                    Log.d("SlidingMenu", "percent = " + percent + "; deltaX = " + deltaX);
 
                     if (deltaX > 0) {
-                        scale = Math.max(mDstScale, scale);
+                        percent = Math.min(1.0f, percent);
                     } else {
-                        scale = Math.min(1.0f, scale);
+                        percent = Math.max(0f, percent);
                     }
 
-                    animate(translationX, scale, false);
+                    mOpenPercent = percent;
+
+                    Log.d("SlidingMenu", "percent = " + percent);
+
+                    mAboveView.animate(percent, false);
+                    mBehindView.animate(percent, false);
+
                 }
 
                 break;
 
             case MotionEvent.ACTION_UP:
-                completeAnimate();
                 endDrag();
+                break;
+            default:
                 break;
         }
 
@@ -249,19 +255,23 @@ public class SlidingMenu extends FrameLayout {
     }
 
     private void startDrag() {
-        mBeingDragged = true;
+        if (!mBeingDragged) {
+            mBeingDragged = true;
+        }
     }
 
     private void endDrag() {
-        mBeingDragged = false;
+        if (mBeingDragged) {
+            completeAnimate();
+            mBeingDragged = false;
+            mLastMotionX = -1;
+            mLastMotionY = -1;
+        }
     }
 
     private void completeAnimate() {
-        if (mCurTranslationX > mDstTranslationX / 2) {
-            showMenu();
-        } else {
-            showContent();
-        }
+        mAboveView.completeAnimate();
+        mBehindView.completeAnimate();
     }
 
     public interface OnOpenedListener {

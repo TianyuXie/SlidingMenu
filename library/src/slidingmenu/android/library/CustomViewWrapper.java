@@ -2,14 +2,12 @@ package slidingmenu.android.library;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
-class CustomViewWrapper extends ViewGroup {
+abstract class CustomViewWrapper extends ViewGroup {
 
-    private View mContent;
+    protected View mContent;
 
     public CustomViewWrapper(Context context) {
         this(context, null);
@@ -51,5 +49,19 @@ class CustomViewWrapper extends ViewGroup {
         final int height = b - t;
 
         mContent.layout(0, 0, width, height);
+    }
+
+    abstract void animate(float openPercent, boolean animate);
+
+    abstract boolean isOpened();
+
+    abstract boolean isHalfOpened();
+
+    void completeAnimate() {
+        if (isHalfOpened()) {
+            animate(1.0f, true);
+        } else {
+            animate(0.0f, true);
+        }
     }
 }
