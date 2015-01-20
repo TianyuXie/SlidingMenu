@@ -7,17 +7,21 @@ import android.view.ViewGroup;
 
 abstract class CustomViewWrapper extends ViewGroup {
 
-    protected View mContent;
+    private View mContent = null;
 
-    public CustomViewWrapper(Context context) {
+    private float mOpenPercent = 0.0f;
+
+    private SlidingMenu.Animatable mAnimator = null;
+
+    CustomViewWrapper(Context context) {
         this(context, null);
     }
 
-    public CustomViewWrapper(Context context, AttributeSet attrs) {
+    CustomViewWrapper(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public void setContent(View v) {
+    public final void setContent(View v) {
         if (mContent != null) {
             removeView(mContent);
         }
@@ -26,8 +30,36 @@ abstract class CustomViewWrapper extends ViewGroup {
         addView(mContent);
     }
 
-    public View getContent() {
+    public final View getContent() {
         return mContent;
+    }
+
+    public final void setAnimator(SlidingMenu.Animatable animator) {
+        mAnimator = animator;
+    }
+
+    final void animate(float openPercent, boolean animate) {
+        mOpenPercent = openPercent;
+
+        if (mAnimator != null) {
+            mAnimator.animate(mContent, openPercent, animate);
+        }
+    }
+
+    final boolean isOpened() {
+        return mOpenPercent == 1.0f;
+    }
+
+    final boolean isHalfOpened() {
+        return mOpenPercent > 0.5f;
+    }
+
+    final void completeAnimate() {
+        if (isHalfOpened()) {
+            animate(1.0f, true);
+        } else {
+            animate(0.0f, true);
+        }
     }
 
     @Override
@@ -40,7 +72,9 @@ abstract class CustomViewWrapper extends ViewGroup {
         final int contentWidth = getChildMeasureSpec(widthMeasureSpec, 0, width);
         final int contentHeight = getChildMeasureSpec(widthMeasureSpec, 0, height);
 
-        mContent.measure(contentWidth, contentHeight);
+        if (mContent != null) {
+            mContent.measure(contentWidth, contentHeight);
+        }
     }
 
     @Override
@@ -48,20 +82,9 @@ abstract class CustomViewWrapper extends ViewGroup {
         final int width = r - l;
         final int height = b - t;
 
-        mContent.layout(0, 0, width, height);
-    }
-
-    abstract void animate(float openPercent, boolean animate);
-
-    abstract boolean isOpened();
-
-    abstract boolean isHalfOpened();
-
-    void completeAnimate() {
-        if (isHalfOpened()) {
-            animate(1.0f, true);
-        } else {
-            animate(0.0f, true);
+        if (mContent != null) {
+            mContent.layout(0, 0, width, height);
         }
     }
+
 }

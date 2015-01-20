@@ -282,4 +282,7 @@ public class SlidingMenu extends FrameLayout {
         void onClosed();
     }
 
+    public interface Animatable {
+        void animate(View view, float percent, boolean animate);
+    }
 }
